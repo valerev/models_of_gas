@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 N = 20  # Кол-во делений пространства
 Per = 100  # Кол-ва делений времени
 
-a = 5
+a = 3
 
 dx = 2 * a / N
 dy = 2 * a / N
@@ -54,6 +54,35 @@ def make_y_step(t, x, y, v_x, v_y):
                                f[1][x][y][v_x][v_y]), 0)
 
 
+def count_collisions_with_walls(time):
+    pre_time = (time - 1)%2
+
+    for y in range(0, N):
+        for v_x in range(number_of_velocities // 2 + 1, number_of_velocities):
+            for v_y in range(number_of_velocities):
+                f[time][0][y][v_x][v_y] = f[pre_time][0][y][number_of_velocities - 1 - v_x][v_y]
+                f[pre_time][0][y][number_of_velocities - 1 - v_x][v_y] = 0
+
+    for y in range(0, N):
+        for v_x in range(number_of_velocities // 2):
+            for v_y in range(number_of_velocities):
+                f[time][N-1][y][v_x][v_y] = f[pre_time][N-1][y][number_of_velocities - 1 - v_x][v_y]
+                f[pre_time][0][y][number_of_velocities - 1 - v_x][v_y] = 0
+
+    for x in range(0, N):
+        for v_y in range(number_of_velocities // 2 + 1, number_of_velocities):
+            for v_x in range(number_of_velocities):
+                f[time][x][0][v_x][v_y] = f[pre_time][x][0][v_x][number_of_velocities - 1 - v_y]
+                f[pre_time][x][0][v_x][number_of_velocities - 1 - v_y] = 0
+
+    for x in range(0, N):
+        for v_y in range(number_of_velocities // 2):
+            for v_x in range(number_of_velocities):
+                f[time][x][N-1][v_x][v_y] = f[pre_time][x][N-1][v_x][number_of_velocities - 1 - v_y]
+                f[pre_time][x][N - 1][v_x][number_of_velocities - 1 - v_y] = 0
+
+
+
 fill_space()
 
 for time in range(0, Per - 1, 2):
@@ -64,15 +93,19 @@ for time in range(0, Per - 1, 2):
                     make_x_step(1, x, y, v_x, v_y)
                     concentration[x][y] += f[1][x][y][v_x][v_y]
             # concentration[x][y] = f[1][x][y][2][2] # We need this only to check, how does it work with one speed
+    count_collisions_with_walls(1)
+
     draw_3d(concentration, time)
     concentration = np.zeros_like(concentration)
 
     for x in range(0, N - 1):  # making step using only y
         for y in range(0, N - 1):
-            for v_x in range(11):
-                for v_y in range(11):
+            for v_x in range(number_of_velocities):
+                for v_y in range(number_of_velocities):
                     make_y_step(0, x, y, v_x, v_y)
                     concentration[x][y] += f[0][x][y][v_x][v_y]
             # concentration[x][y] = f[0][x][y][2][2] # We need this only to check, how does it work with one speed
+    count_collisions_with_walls(0)
+
     draw_3d(concentration, time + 1)
     concentration = np.zeros_like(concentration)
