@@ -10,24 +10,49 @@ dx = 2 * a / N
 dy = 2 * a / N
 dt = 0.1
 
-f = np.zeros(N * N * 2 * 11 * 11).reshape(2, N, N, 11, 11)
+number_of_velocities = 11 # In one direction
 
-for x in range(N):
-    for y in range(N):
-        for v_x in range(11):
-            for v_y in range(11):
-                f[0][x][y][v_x][v_y] = np.exp(-((dx * x - a)**2 +
-                                      (dy * y - a)**2)/ 2)  # Начальные условия
+f = np.zeros(N * N * 2 * number_of_velocities * number_of_velocities)
+f = f.reshape(2, N, N, number_of_velocities, number_of_velocities)
 
+space_x = np.linspace(2*dx, dx * (N-2), N)
+space_y = np.linspace(2*dy, dy * (N-2), N)
 
-
-x = np.linspace(2*dx, dx * (N-2), N)
-y = np.linspace(2*dy, dy * (N-2), N)
-
-X, Y = np.meshgrid(x, y)
-
+X, Y = np.meshgrid(space_x, space_y)
 
 concentration = np.zeros(N * N ).reshape( N, N)
+
+
+def fill_space():
+    for x in range(N):
+        for y in range(N):
+            for v_x in range(11):
+                for v_y in range(11):
+                    f[0][x][y][v_x][v_y] = np.exp(-((dx * x - a)**2 +
+                                          (dy * y - a)**2)/ 2)  # Начальные условия
+
+
+def draw_3d(c, n):
+    fig = plt.figure()  # creating an image
+    ax = plt.axes(xlim=(2 * dx, dx * (N - 2)), ylim=(2 * dy, dy * (N - 2)), zlim=(0, 100), projection='3d')
+    ax.plot_surface(X, Y, c, cmap='Blues')
+    fig.savefig('gas' + '{0:d}'.format(n + 1000) + '.jpg')
+    plt.close('all')
+
+
+def make_x_step(t, x, y, v_x, v_y):
+    a = abs((v_x - 5) * dt / dx)
+    f[t][x][y][v_x][v_y] = max(f[0][x][y][v_x][v_y] + a * (f[0][x + np.sign(v_x - 5)][y][v_x][v_y] -
+                                                           f[0][x][y][v_x][v_y]), 0)
+
+
+def make_y_step(t, x, y, v_x, v_y):
+    a = abs((v_y - 5) * dt / dy)
+    f[t][x][y][v_x][v_y] = max(f[1][x][y][v_x][v_y] + a * (f[1][x][y + np.sign(v_y - 5)][v_x][v_y] -
+                                                           f[1][x][y][v_x][v_y]), 0)
+
+
+fill_space()
 
 for time in range(0, Per - 1, 2):
     for x in range(0, N - 1):  # Making step using only x
@@ -35,34 +60,22 @@ for time in range(0, Per - 1, 2):
             for v_x in range(11):
                 for v_y in range(11):
                     a = abs((v_x - 5) * dt / dx)
-                    f[1][x][y][v_x][v_y] = max(f[0][x][y][v_x][v_y] + a * (f[0][x+np.sign(v_x-5)][y][v_x][v_y] -
-                                   f[0][x][y][v_x][v_y]), 0)
+                    f[1][x][y][v_x][v_y] = max(f[0][x][y][v_x][v_y] + a * (f[0][x + np.sign(v_x - 5)][y][v_x][v_y] -
+                                                                           f[0][x][y][v_x][v_y]), 0)
                     concentration[x][y] += f[1][x][y][v_x][v_y]
-            #concentration[x][y] = f[1][x][y][2][2]
+            # concentration[x][y] = f[1][x][y][2][2] # We need this only to check, how does it work with one speed
 
-
-    fig = plt.figure() # creating an image
-    ax = plt.axes(xlim=(2*dx, dx * (N - 2)), ylim=(2*dy, dy * (N - 2)), zlim=(0, 100), projection='3d')
-    ax.plot_surface(X, Y, concentration, cmap='Blues')
-    fig.savefig('gas' + '{0:d}'.format(time + 1000) + '.jpg')
-    plt.close('all')
-
+    draw_3d(concentration, time)
     concentration = np.zeros_like(concentration)
 
     for x in range(0, N - 1):  # making step using only y
         for y in range(0, N - 1):
             for v_x in range(11):
                 for v_y in range(11):
-                    a = abs((v_y - 5)*dt/dy)
-                    f[0][x][y][v_x][v_y] = max(f[1][x][y][v_x][v_y] + a * (f[1][x][y+np.sign(v_y - 5)][v_x][v_y] -
-                                   f[1][x][y][v_x][v_y]), 0)
+                    a = abs((v_y - 5) * dt / dy)
+                    f[0][x][y][v_x][v_y] = max(f[1][x][y][v_x][v_y] + a * (f[1][x][y + np.sign(v_y - 5)][v_x][v_y] -
+                                                                           f[1][x][y][v_x][v_y]), 0)
                     concentration[x][y] += f[0][x][y][v_x][v_y]
-            #concentration[x][y] = f[0][x][y][2][2]
-
-
-    fig = plt.figure() # creating an image
-    ax = plt.axes(xlim=(2*dx, dx * (N - 2)), ylim=(2*dy, dy * (N - 2)), zlim=(0, 100), projection='3d')
-    ax.plot_surface(X, Y, concentration, cmap='Blues')
-    fig.savefig('gas' + '{0:d}'.format(time + 1001) + '.jpg')
-    plt.close('all')
+            # concentration[x][y] = f[0][x][y][2][2] # We need this only to check, how does it work with one speed
+    draw_3d(concentration, time + 1)
     concentration = np.zeros_like(concentration)
