@@ -26,8 +26,8 @@ concentration = np.zeros(N * N ).reshape( N, N)
 def fill_space():
     for x in range(N):
         for y in range(N):
-            for v_x in range(11):
-                for v_y in range(11):
+            for v_x in range(number_of_velocities):
+                for v_y in range(number_of_velocities):
                     f[0][x][y][v_x][v_y] = np.exp(-((dx * x - a)**2 +
                                           (dy * y - a)**2)/ 2)  # Начальные условия
 
@@ -41,15 +41,17 @@ def draw_3d(c, n):
 
 
 def make_x_step(t, x, y, v_x, v_y):
-    a = abs((v_x - 5) * dt / dx)
-    f[t][x][y][v_x][v_y] = max(f[0][x][y][v_x][v_y] + a * (f[0][x + np.sign(v_x - 5)][y][v_x][v_y] -
-                                                           f[0][x][y][v_x][v_y]), 0)
+    a = abs((v_x - number_of_velocities//2) * dt / dx)
+    f[t][x][y][v_x][v_y] = max(f[0][x][y][v_x][v_y] +
+                               a * (f[0][x + np.sign(v_x - number_of_velocities//2)][y][v_x][v_y] -
+                               f[0][x][y][v_x][v_y]), 0)
 
 
 def make_y_step(t, x, y, v_x, v_y):
-    a = abs((v_y - 5) * dt / dy)
-    f[t][x][y][v_x][v_y] = max(f[1][x][y][v_x][v_y] + a * (f[1][x][y + np.sign(v_y - 5)][v_x][v_y] -
-                                                           f[1][x][y][v_x][v_y]), 0)
+    a = abs((v_y - number_of_velocities//2) * dt / dy)
+    f[t][x][y][v_x][v_y] = max(f[1][x][y][v_x][v_y] +
+                               a * (f[1][x][y + np.sign(v_y - number_of_velocities//2)][v_x][v_y] -
+                               f[1][x][y][v_x][v_y]), 0)
 
 
 fill_space()
@@ -57,14 +59,11 @@ fill_space()
 for time in range(0, Per - 1, 2):
     for x in range(0, N - 1):  # Making step using only x
         for y in range(0, N - 1):
-            for v_x in range(11):
-                for v_y in range(11):
-                    a = abs((v_x - 5) * dt / dx)
-                    f[1][x][y][v_x][v_y] = max(f[0][x][y][v_x][v_y] + a * (f[0][x + np.sign(v_x - 5)][y][v_x][v_y] -
-                                                                           f[0][x][y][v_x][v_y]), 0)
+            for v_x in range(number_of_velocities):
+                for v_y in range(number_of_velocities):
+                    make_x_step(1, x, y, v_x, v_y)
                     concentration[x][y] += f[1][x][y][v_x][v_y]
             # concentration[x][y] = f[1][x][y][2][2] # We need this only to check, how does it work with one speed
-
     draw_3d(concentration, time)
     concentration = np.zeros_like(concentration)
 
@@ -72,9 +71,7 @@ for time in range(0, Per - 1, 2):
         for y in range(0, N - 1):
             for v_x in range(11):
                 for v_y in range(11):
-                    a = abs((v_y - 5) * dt / dy)
-                    f[0][x][y][v_x][v_y] = max(f[1][x][y][v_x][v_y] + a * (f[1][x][y + np.sign(v_y - 5)][v_x][v_y] -
-                                                                           f[1][x][y][v_x][v_y]), 0)
+                    make_y_step(0, x, y, v_x, v_y)
                     concentration[x][y] += f[0][x][y][v_x][v_y]
             # concentration[x][y] = f[0][x][y][2][2] # We need this only to check, how does it work with one speed
     draw_3d(concentration, time + 1)
