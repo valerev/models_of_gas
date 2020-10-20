@@ -28,7 +28,7 @@ def fill_space(is_one_velocity = False):
     if is_one_velocity:
         for x in range(N):
             for y in range(N):
-                        f[0][x][y][2][2] = np.exp(-((dx * x - a)**2 +
+                        f[0][x][y][4][2] = np.exp(-((dx * x - a)**2 +
                                               (dy * y - a)**2)/ 2)  # Начальные условия
     else:
         for x in range(N):
@@ -40,12 +40,12 @@ def fill_space(is_one_velocity = False):
 
 
 fig = plt.figure()  # creating an image
-ax = plt.axes(xlim=(2 * dx, dx * (N - 2)), ylim=(2 * dy, dy * (N - 2)), zlim=(0, 100), projection='3d')
+ax = plt.axes(xlim=(2 * dx, dx * (N - 2)), ylim=(2 * dy, dy * (N - 2)))
 
 
 def draw_3d(c):
     ax.clear()
-    return ax.plot_surface(X, Y, c, cmap='Blues')
+    return ax.pcolormesh(X, Y, c, cmap='Blues')
     #fig.savefig('gas' + '{0:d}'.format(n + 1000) + '.jpg')
 
 
@@ -56,14 +56,14 @@ def print_plot(n):
 def make_x_step(t, x, y, v_x, v_y):
     a = abs((v_x - number_of_velocities//2) * dt / dx)
     f[t][x][y][v_x][v_y] = max(f[0][x][y][v_x][v_y] +
-                               a * (f[0][x + np.sign(v_x - number_of_velocities//2)][y][v_x][v_y] -
+                               a * (f[0][x - np.sign(v_x - number_of_velocities//2)][y][v_x][v_y] -
                                f[0][x][y][v_x][v_y]), 0)
 
 
 def make_y_step(t, x, y, v_x, v_y):
     a = abs((v_y - number_of_velocities//2) * dt / dy)
     f[t][x][y][v_x][v_y] = max(f[1][x][y][v_x][v_y] +
-                               a * (f[1][x][y + np.sign(v_y - number_of_velocities//2)][v_x][v_y] -
+                               a * (f[1][x][y - np.sign(v_y - number_of_velocities//2)][v_x][v_y] -
                                f[1][x][y][v_x][v_y]), 0)
 
 

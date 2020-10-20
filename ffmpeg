@@ -1,0 +1,1 @@
+ffmpeg -framerate 30 -start_number 1000 -i gas%4d.jpg output.gif
