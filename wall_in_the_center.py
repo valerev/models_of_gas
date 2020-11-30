@@ -1,0 +1,245 @@
+from datetime import datetime
+from matplotlib import pyplot as plt    
+from matplotlib.animation import FuncAnimation
+
+import numpy
+
+rx, ry, ax, ay = 10, 10, 20, 30
+eps = 0.01
+
+n_epoch = 200
+n_x, n_y, n_vx, n_vy = 100, 100, 7, 7
+dt, dx, dy, dv = 1, 1, 1, 0.2
+
+data = numpy.zeros((n_x, n_y, n_vx, n_vy))
+prev_data = data.copy()
+
+concent = 1
+
+
+fig = plt.figure()
+axes = plt.axes(
+                #projection='3d'
+                )
+#space_x = numpy.linspace(0, dx * n_x, n_x)
+#space_y = numpy.linspace(61 * dy, dy * n_y, n_y - 61)
+#X, Y = numpy.meshgrid(space_x, space_y)
+X = numpy.arange(61 * dx, dx * n_x, dx)
+Y = numpy.arange(0 * dy, dy * n_y, dy)
+
+
+def draw(surface):
+    axes.clear()
+    #axes.set_zlim((0, 2))
+    #print(len(X))
+    #print(len(Y))
+    #print(surface[:, 61:])
+    return axes.contourf(X, Y, surface[:, 61:], cmap='inferno')
+
+
+def get_v(i_vx, i_vy):
+    vx = (i_vx - (n_vx - 1) / 2.0) * dv
+    vy = (i_vy - (n_vy - 1) / 2.0) * dv
+    return vx, vy
+
+
+S_all = 0
+for i_vx in range(n_vx):
+    for i_vy in range(n_vy):
+        v = get_v(i_vx, i_vy)
+        S_all += numpy.exp(-0.5 * (v[0]**2 + v[1]**2))
+
+
+def initial_f(i_x, i_y, i_vx, i_vy):
+    if i_y < 61:
+        return concent*numpy.exp(-0.5 * ((i_vx - n_vx//2)**2 + (i_vy - n_vy//2)**2))/S_all
+    if i_y > 60:
+        return 0.01*concent*numpy.exp(-0.5 * ((i_vx - n_vx//2)**2 + (i_vy - n_vy//2)**2))/S_all
+    return eps
+
+
+def initialize():
+    for i_vx in range(n_vx):
+        for i_vy in range(n_vy):
+            for i_x in range(n_x):
+                for i_y in range(n_y):
+                    prev_data[i_x, i_y, i_vx, i_vy] = initial_f(i_x, i_y, i_vx, i_vy)
+
+
+S_x, S_y = 0, 0  # Я не придумал хороших названий, но это константы в знаментале, при высичлении диффузного отражения
+
+for i_vx in range(n_vx//2):
+    for i_vy in range(n_vy):
+        v = get_v(i_vx, i_vy)
+        S_x += numpy.exp(-0.5 * (v[0]**2 + v[1]**2))
+
+for i_vx in range(n_vx):
+    for i_vy in range(n_vy//2):
+        v = get_v(i_vx, i_vy)
+        S_y += numpy.exp(-0.5 * (v[0]**2 + v[1]**2))
+
+assert S_x == S_y
+
+def is_border(i_x, i_y, i_vx, i_vy):
+    v = get_v(i_vx, i_vy)
+    is_right = all([i_x + 1 == n_x, v[0] > 0, i_y <= 60]) or all([i_x == 14, v[0] > 0, i_y == 61])
+    is_left = all([i_x == 0, v[0] < 0, i_y <= 61])
+    is_bottom = all([i_y == 60, v[1] > 0, i_x >= 15])
+    is_outside = all([i_y + 1 == 61, v[1] < 0, i_x >= 15])
+    is_top = i_y == 0 and v[1] < 0
+    return any([is_right, is_left, is_bottom, is_top, is_outside])
+
+
+# Обычная формула
+def formula_rough(prev_data, i_vx, i_vy, direction):
+    v = get_v(i_vx, i_vy)
+    v_projection = numpy.dot(v, direction)
+    this_prev = prev_data[:, :, i_vx, i_vy]
+    if v_projection > 0:
+        right_prev = numpy.roll(this_prev, - numpy.array(direction), axis=(0, 1))  # Те, которые i+1
+        diff = (right_prev - this_prev)
+    else:
+        left_prev = numpy.roll(this_prev, direction, axis=(0, 1))  # Те, которые i-1
+        diff = (this_prev - left_prev)
+    return this_prev + v_projection * dt / dx * diff
+
+
+# Формула более точная
+def formula_precise(prev_data, i_vx, i_vy, direction):
+    v = get_v(i_vx, i_vy)
+    gamma = numpy.dot(v, direction) * dt / dx
+
+    this_prev = prev_data[:, :, i_vx, i_vy]
+    left_prev = numpy.roll(this_prev, - numpy.array(direction), axis=(0, 1))  # Те, которые i-1
+    right_prev = numpy.roll(this_prev, numpy.array(direction), axis=(0, 1))  # Те, которые i+1
+    value = gamma * (1 + gamma) * left_prev / 2 \
+            + (1 - gamma * gamma) * this_prev \
+            - gamma * (1 - gamma) * right_prev / 2
+    return value
+
+
+def calculate_concentration():
+    return numpy.add.reduce(data[:, :, :, :], (2, 3))
+
+
+def save_to_file(filename, array):
+    lines = []
+    for i_x in range(n_x):
+        for i_y in range(n_y):
+            lines.append(f"{i_x}\t{i_y}\t{array[i_x, i_y]}\n")
+
+    with open(filename, "w") as f:
+        f.writelines(lines)
+
+
+def calc_epoch(i):
+    global data, prev_data
+    for i_vx in range(n_vx):
+        for i_vy in range(n_vy):
+            v = get_v(i_vx, i_vy)
+            data[1:-1, :61, i_vx, i_vy] = formula_precise(prev_data, i_vx, i_vy, (1, 0))[1:-1, :61]
+            data[1:14, 61, i_vx, i_vy] = formula_precise(prev_data, i_vx, i_vy, (1, 0))[1:14, 61]
+            data[1:-1, 62:, i_vx, i_vy] = formula_precise(prev_data, i_vx, i_vy, (1, 0))[1:-1, 62:]
+            if v[0] < 0:
+                # Скорость направлена вправо
+                data[-1:, :61, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (1, 0))[-1:, :61]
+                data[14:15, 61, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (1, 0))[14:15, 61]
+                data[-1:, 62:, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (1, 0))[-1:, 62:]
+            else:
+                # Скорость направлена влево
+                data[:1, :, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (-1, 0))[:1, :]
+   
+    # Зеркальное отражение по X
+    #for i_y in range(n_y):
+    #    for i_vx in range(n_vx):
+    #        for i_vy in range(n_vy):
+    #            v = get_v(i_vx, i_vy)
+    #            if v[0] < 0:
+    #                data[0, i_y, i_vx, i_vy] = prev_data[0, i_y, n_vx - i_vx - 1, i_vy]
+    #            else:
+    #                data[n_x - 1, i_y, i_vx, i_vy] = prev_data[n_x - 1, i_y, n_vx - i_vx - 1, i_vy]
+    
+    S_pos_x = numpy.add.reduce(prev_data[0, :62, n_vx//2+1:, :], (1, 2))
+    S_neg_x = numpy.add.reduce(prev_data[n_x - 1, :61, :n_vx//2, :], (1, 2)) 
+    S_wall_x = numpy.add.reduce(prev_data[14, 61, :n_vx//2, :], (0, 1))
+  
+    for i_vx in range(n_vx):
+        for i_vy in range(n_vy):
+            v = get_v(i_vx, i_vy)
+            if v[0] < 0:
+                data[0, :62, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_pos_x/S_x
+            elif v[0] > 0:
+                data[n_x - 1, :61, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_neg_x/S_x
+                data[14, 61, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_wall_x/S_x
+                
+
+    data, prev_data = prev_data, data
+
+    for i_vx in range(n_vx):
+        for i_vy in range(n_vy):
+            v = get_v(i_vx, i_vy)
+            data[:, 1:60, i_vx, i_vy] = formula_precise(prev_data, i_vx, i_vy, (0, 1))[:, 1:60]
+            data[:15, 60:63, i_vx, i_vy] = formula_precise(prev_data, i_vx, i_vy, (0, 1))[:15, 60:63]
+            data[:, 63:-1, i_vx, i_vy] = formula_precise(prev_data, i_vx, i_vy, (0, 1))[:, 63:-1]
+            if v[1] < 0:
+                data[15:, 60:61, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (0, 1))[15:, 60:61]
+                data[:, -1, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (0, 1))[:, -1]
+            else:
+                data[:, :1, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (0, 1))[:, :1]
+                data[15:, 62:63, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (0, 1))[15:, 62:63]
+   
+    # Зеркальное отражение по Y
+    #for i_x in range(n_x):
+    #    for i_vx in range(n_vx):
+    #        for i_vy in range(n_vy):
+    #            v = get_v(i_vx, i_vy)
+    #            if v[1] < 0:
+    #                data[i_x, 0, i_vx, i_vy] = prev_data[i_x, 0, i_vx, n_vy - i_vy - 1]
+    #            else:
+    #                data[i_x, n_y - 1, i_vx, i_vy] = prev_data[i_x, n_y - 1, i_vx, n_vy - i_vy - 1]
+    
+    S_pos_y = numpy.add.reduce(prev_data[:, 0, :, n_vy//2+1:], (1, 2)) 
+    S_neg_y = numpy.add.reduce(prev_data[15:, 60, :, :n_vy//2], (1, 2))
+    S_out_y = numpy.add.reduce(prev_data[15:, 62, :, n_vy//2+1:], (1, 2))
+    
+    for i_vx in range(n_vx):
+        for i_vy in range(n_vy):
+            v = get_v(i_vx, i_vy)
+            if v[1] < 0:
+                data[15:, 62, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_out_y/S_y
+                data[:, 0, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_pos_y/S_y
+            elif v[1] > 0:
+                data[15:, 60, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_neg_y/S_y
+   
+
+    print (numpy.add.reduce(data[:, 0, :, :3], (0, 1, 2)) / numpy.add.reduce(prev_data[:, 0, :, 4:], (0, 1, 2)))
+    print ('\n')
+
+
+    data, prev_data = prev_data, data
+
+    concentration = calculate_concentration()
+    total_count = numpy.add.reduce(concentration, (0, 1))
+    #if i % 10 == 0:
+    time = datetime.now().time()
+    print(f"{time}. Step {i}. Total count: {total_count}")
+    #save_to_file(f"out_{i:03}.dat", concentration)
+    #return total_count 
+    return draw(concentration)
+
+
+def main():
+    initialize()
+    total_count_array = []
+    #for i in range(n_epoch):
+    #    total_count = calc_epoch(i)
+    #    total_count_array.append(total_count)
+    #value = numpy.std(total_count_array)
+    #print("Standard deviation: ", value)
+
+
+main()
+_animation = FuncAnimation(fig, calc_epoch, repeat=False, frames=n_epoch)
+#plt.show()
+
+_animation.save('outflow_more_conc_in_right.gif', writer='imagemagic', fps=15)
