@@ -7,34 +7,38 @@ import numpy
 rx, ry, ax, ay = 10, 10, 20, 30
 eps = 0.01
 
-n_epoch = 200
-n_x, n_y, n_vx, n_vy = 100, 100, 7, 7
-dt, dx, dy, dv = 1, 1, 1, 0.2
+n_epoch = 500
+n_x, n_y, n_vx, n_vy = 50, 50, 15, 15
+dt, dx, dy, dv = 2, 2, 2, 0.1  # It was 1, 1, 1, 0.2
 
 data = numpy.zeros((n_x, n_y, n_vx, n_vy))
 prev_data = data.copy()
 
-concent = 1
+concent = 100
+
+wall_x_phy = 15
+wall_y_phy = 50
+
+wall_x = (wall_x_phy * n_x) // 100
+wall_y = (wall_y_phy * n_y) // 100
 
 
 fig = plt.figure()
 axes = plt.axes(
                 #projection='3d'
                 )
-#space_x = numpy.linspace(0, dx * n_x, n_x)
-#space_y = numpy.linspace(61 * dy, dy * n_y, n_y - 61)
-#X, Y = numpy.meshgrid(space_x, space_y)
-X = numpy.arange(61 * dx, dx * n_x, dx)
-Y = numpy.arange(0 * dy, dy * n_y, dy)
+space_x = numpy.linspace(0, dx * n_x, n_x)
+space_y = numpy.linspace(0, dy * n_y, n_y)
+X, Y = numpy.meshgrid(space_x, space_y)
+#X = numpy.arange(61 * dx, dx * n_x, dx)
+#Y = numpy.arange(0 * dy, dy * n_y, dy)
 
+levels = numpy.linspace(0, 5, 500)
 
 def draw(surface):
     axes.clear()
     #axes.set_zlim((0, 2))
-    #print(len(X))
-    #print(len(Y))
-    #print(surface[:, 61:])
-    return axes.contourf(X, Y, surface[:, 61:], cmap='inferno')
+    return axes.contourf(X, Y, surface, cmap='inferno', levels=levels)
 
 
 def get_v(i_vx, i_vy):
@@ -51,10 +55,10 @@ for i_vx in range(n_vx):
 
 
 def initial_f(i_x, i_y, i_vx, i_vy):
-    if i_y < 61:
+    if i_y < wall_y:
         return concent*numpy.exp(-0.5 * ((i_vx - n_vx//2)**2 + (i_vy - n_vy//2)**2))/S_all
-    if i_y > 60:
-        return 0.01*concent*numpy.exp(-0.5 * ((i_vx - n_vx//2)**2 + (i_vy - n_vy//2)**2))/S_all
+    if i_y > wall_y - 1:
+        return 0.001*concent*numpy.exp(-0.5 * ((i_vx - n_vx//2)**2 + (i_vy - n_vy//2)**2))/S_all
     return eps
 
 
@@ -78,14 +82,14 @@ for i_vx in range(n_vx):
         v = get_v(i_vx, i_vy)
         S_y += numpy.exp(-0.5 * (v[0]**2 + v[1]**2))
 
-assert S_x == S_y
+#assert S_x == S_y
 
 def is_border(i_x, i_y, i_vx, i_vy):
     v = get_v(i_vx, i_vy)
-    is_right = all([i_x + 1 == n_x, v[0] > 0, i_y <= 60]) or all([i_x == 14, v[0] > 0, i_y == 61])
-    is_left = all([i_x == 0, v[0] < 0, i_y <= 61])
-    is_bottom = all([i_y == 60, v[1] > 0, i_x >= 15])
-    is_outside = all([i_y + 1 == 61, v[1] < 0, i_x >= 15])
+    is_right = all([i_x + 1 == n_x, v[0] > 0, i_y <= wall_y-1]) or all([i_x == wall_x - 1, v[0] > 0, i_y == wall_y])
+    is_left = all([i_x == 0, v[0] < 0, i_y <= wall_y])
+    is_bottom = all([i_y == wall_y - 1, v[1] > 0, i_x >= wall_x])
+    is_outside = all([i_y + 1 == wall_y, v[1] < 0, i_x >= wall_x])
     is_top = i_y == 0 and v[1] < 0
     return any([is_right, is_left, is_bottom, is_top, is_outside])
 
@@ -137,14 +141,14 @@ def calc_epoch(i):
     for i_vx in range(n_vx):
         for i_vy in range(n_vy):
             v = get_v(i_vx, i_vy)
-            data[1:-1, :61, i_vx, i_vy] = formula_precise(prev_data, i_vx, i_vy, (1, 0))[1:-1, :61]
-            data[1:14, 61, i_vx, i_vy] = formula_precise(prev_data, i_vx, i_vy, (1, 0))[1:14, 61]
-            data[1:-1, 62:, i_vx, i_vy] = formula_precise(prev_data, i_vx, i_vy, (1, 0))[1:-1, 62:]
+            data[1:-1, :wall_y, i_vx, i_vy] = formula_precise(prev_data, i_vx, i_vy, (1, 0))[1:-1, :wall_y]
+            data[1:wall_x - 1, wall_y, i_vx, i_vy] = formula_precise(prev_data, i_vx, i_vy, (1, 0))[1:wall_x - 1, wall_y]
+            data[1:-1, wall_y + 1:, i_vx, i_vy] = formula_precise(prev_data, i_vx, i_vy, (1, 0))[1:-1, wall_y + 1:]
             if v[0] < 0:
                 # Скорость направлена вправо
-                data[-1:, :61, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (1, 0))[-1:, :61]
-                data[14:15, 61, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (1, 0))[14:15, 61]
-                data[-1:, 62:, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (1, 0))[-1:, 62:]
+                data[-1:, :wall_y, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (1, 0))[-1:, :wall_y]
+                data[wall_x - 1, wall_y, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (1, 0))[wall_x - 1, wall_y]
+                data[-1:, wall_y + 1:, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (1, 0))[-1:, wall_y + 1:]
             else:
                 # Скорость направлена влево
                 data[:1, :, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (-1, 0))[:1, :]
@@ -159,18 +163,18 @@ def calc_epoch(i):
     #            else:
     #                data[n_x - 1, i_y, i_vx, i_vy] = prev_data[n_x - 1, i_y, n_vx - i_vx - 1, i_vy]
     
-    S_pos_x = numpy.add.reduce(prev_data[0, :62, n_vx//2+1:, :], (1, 2))
-    S_neg_x = numpy.add.reduce(prev_data[n_x - 1, :61, :n_vx//2, :], (1, 2)) 
-    S_wall_x = numpy.add.reduce(prev_data[14, 61, :n_vx//2, :], (0, 1))
+    S_pos_x = numpy.add.reduce(prev_data[0, :wall_y + 1, n_vx//2+1:, :], (1, 2))
+    S_neg_x = numpy.add.reduce(prev_data[n_x - 1, :wall_y, :n_vx//2, :], (1, 2)) 
+    S_wall_x = numpy.add.reduce(prev_data[wall_x - 1, wall_y, :n_vx//2, :], (0, 1))
   
     for i_vx in range(n_vx):
         for i_vy in range(n_vy):
             v = get_v(i_vx, i_vy)
             if v[0] < 0:
-                data[0, :62, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_pos_x/S_x
+                data[0, :wall_y + 1, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_pos_x/S_x
             elif v[0] > 0:
-                data[n_x - 1, :61, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_neg_x/S_x
-                data[14, 61, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_wall_x/S_x
+                data[n_x - 1, :wall_y, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_neg_x/S_x
+                data[wall_x - 1, wall_y, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_wall_x/S_x
                 
 
     data, prev_data = prev_data, data
@@ -178,15 +182,15 @@ def calc_epoch(i):
     for i_vx in range(n_vx):
         for i_vy in range(n_vy):
             v = get_v(i_vx, i_vy)
-            data[:, 1:60, i_vx, i_vy] = formula_precise(prev_data, i_vx, i_vy, (0, 1))[:, 1:60]
-            data[:15, 60:63, i_vx, i_vy] = formula_precise(prev_data, i_vx, i_vy, (0, 1))[:15, 60:63]
-            data[:, 63:-1, i_vx, i_vy] = formula_precise(prev_data, i_vx, i_vy, (0, 1))[:, 63:-1]
+            data[:, 1:wall_y - 1, i_vx, i_vy] = formula_precise(prev_data, i_vx, i_vy, (0, 1))[:, 1:wall_y - 1]
+            data[:wall_x, wall_y - 1:wall_y + 2, i_vx, i_vy] = formula_precise(prev_data, i_vx, i_vy, (0, 1))[:wall_x, wall_y-1:wall_y+2]
+            data[:, wall_y + 2:-1, i_vx, i_vy] = formula_precise(prev_data, i_vx, i_vy, (0, 1))[:, wall_y + 2:-1]
             if v[1] < 0:
-                data[15:, 60:61, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (0, 1))[15:, 60:61]
+                data[wall_x:, wall_y - 1, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (0, 1))[wall_x:, wall_y - 1]
                 data[:, -1, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (0, 1))[:, -1]
             else:
                 data[:, :1, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (0, 1))[:, :1]
-                data[15:, 62:63, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (0, 1))[15:, 62:63]
+                data[wall_x:, wall_y + 1, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (0, 1))[wall_x:, wall_y + 1]
    
     # Зеркальное отражение по Y
     #for i_x in range(n_x):
@@ -199,17 +203,17 @@ def calc_epoch(i):
     #                data[i_x, n_y - 1, i_vx, i_vy] = prev_data[i_x, n_y - 1, i_vx, n_vy - i_vy - 1]
     
     S_pos_y = numpy.add.reduce(prev_data[:, 0, :, n_vy//2+1:], (1, 2)) 
-    S_neg_y = numpy.add.reduce(prev_data[15:, 60, :, :n_vy//2], (1, 2))
-    S_out_y = numpy.add.reduce(prev_data[15:, 62, :, n_vy//2+1:], (1, 2))
+    S_neg_y = numpy.add.reduce(prev_data[wall_x:, wall_y - 1, :, :n_vy//2], (1, 2))
+    S_out_y = numpy.add.reduce(prev_data[wall_x:, wall_y + 1, :, n_vy//2+1:], (1, 2))
     
     for i_vx in range(n_vx):
         for i_vy in range(n_vy):
             v = get_v(i_vx, i_vy)
             if v[1] < 0:
-                data[15:, 62, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_out_y/S_y
+                data[wall_x:, wall_y + 1, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_out_y/S_y
                 data[:, 0, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_pos_y/S_y
             elif v[1] > 0:
-                data[15:, 60, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_neg_y/S_y
+                data[wall_x:, wall_y - 1, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_neg_y/S_y
    
 
     print (numpy.add.reduce(data[:, 0, :, :3], (0, 1, 2)) / numpy.add.reduce(prev_data[:, 0, :, 4:], (0, 1, 2)))
@@ -242,4 +246,4 @@ main()
 _animation = FuncAnimation(fig, calc_epoch, repeat=False, frames=n_epoch)
 #plt.show()
 
-_animation.save('outflow_more_conc_in_right.gif', writer='imagemagic', fps=15)
+_animation.save('outflow_2.gif', writer='imagemagic', fps=15)
