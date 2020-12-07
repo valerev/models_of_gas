@@ -1,4 +1,3 @@
-from datetime import datetime
 from matplotlib import pyplot as plt    
 from matplotlib.animation import FuncAnimation
 
@@ -7,7 +6,7 @@ import numpy
 rx, ry, ax, ay = 10, 10, 50, 20
 eps = 0.01
 
-n_epoch = 150
+n_epoch = 200
 n_x, n_y, n_vx, n_vy = 100, 100, 7, 7
 dt, dx, dy, dv = 1, 1, 1, 0.2
 
@@ -48,7 +47,13 @@ def get_v(i_vx, i_vy):
     return vx, vy
 
 
+Vx_plus = numpy.arange(1,  n_vx//2 + 1)*dv
+Vx_minu = numpy.arange(-(n_vx//2), 0)*dv
+Vy_plus = numpy.arange(1,  n_vy//2 + 1)*dv
+Vy_minu = numpy.arange(-(n_vy//2), 0)*dv
+
 S_x, S_y = 0, 0  # Я не придумал хороших названий, но это константы в знаментале, при высичлении диффузного отражения
+
 
 for i_vx in range(n_vx//2):
     for i_vy in range(n_vy):
@@ -113,6 +118,42 @@ def save_to_file(filename, array):
         f.writelines(lines)
 
 
+def easy_x_diffusion():
+    S_pos_x = numpy.add.reduce(prev_data[0, :, n_vx//2+1:, :], (1, 2))
+    S_neg_x = numpy.add.reduce(prev_data[n_x - 1, :, :n_vx//2, :], (1, 2)) 
+ 
+    counter1 = 0
+    counter2 = 0
+    for i_vx in range(n_vx):
+        for i_vy in range(n_vy):
+            v = get_v(i_vx, i_vy)
+            if v[0] < 0:
+                counter1 += 1
+                data[0, :, i_vx, i_vy] = S_pos_x /((n_vx//2) * n_vy)
+            elif v[0] > 0:
+                counter2 += 1 
+                data[n_x - 1, :, i_vx, i_vy] = S_neg_x/((n_vx//2) * n_vy)                
+    if counter1 != (n_vx//2) * n_vy:
+        print('ERROR (counter1)!!! ' + str(counter1) + ' Is not ' + str((n_vx//2) * n_vy))
+    if counter2 != (n_vx//2) * n_vy:
+        print('ERROR (counter2)!!! ' + str(counter2) + ' Is not ' + str((n_vx//2) * n_vy))
+
+
+def easy_y_diffusion():
+    S_pos_y = numpy.add.reduce(prev_data[:, 0, :, n_vy//2+1:], (1, 2)) 
+    S_neg_y = numpy.add.reduce(prev_data[:, n_y - 1, :, :n_vy//2], (1, 2))
+    
+    for i_vx in range(n_vx):
+        for i_vy in range(n_vy):
+            v = get_v(i_vx, i_vy)
+            if v[1] < 0:
+                data[:, 0, i_vx, i_vy] = S_pos_y / (n_vx * (n_vy//2))
+            elif v[1] > 0:
+                data[:, n_y - 1, i_vx, i_vy] = S_neg_y / (n_vx * (n_vy//2))
+  
+ 
+
+
 def calc_epoch(i):
     global data, prev_data
     for i_vx in range(n_vx):
@@ -127,26 +168,40 @@ def calc_epoch(i):
                 data[:1, :, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (-1, 0))[:1, :]
    
     # Зеркальное отражение по X
-    #for i_y in range(n_y):
-    #    for i_vx in range(n_vx):
-    #        for i_vy in range(n_vy):
-    #            v = get_v(i_vx, i_vy)
-    #            if v[0] < 0:
-    #                data[0, i_y, i_vx, i_vy] = prev_data[0, i_y, n_vx - i_vx - 1, i_vy]
-    #            else:
-    #                data[n_x - 1, i_y, i_vx, i_vy] = prev_data[n_x - 1, i_y, n_vx - i_vx - 1, i_vy]
+    for i_y in range(n_y):
+        for i_vx in range(n_vx):
+            for i_vy in range(n_vy):
+                v = get_v(i_vx, i_vy)
+                if v[0] < 0:
+                    data[0, i_y, i_vx, i_vy] = prev_data[0, i_y, n_vx - i_vx - 1, i_vy]
+                else:
+                    data[n_x - 1, i_y, i_vx, i_vy] = prev_data[n_x - 1, i_y, n_vx - i_vx - 1, i_vy]
     
-    S_pos_x = numpy.add.reduce(prev_data[0, :, n_vx//2+1:, :], (1, 2))
-    S_neg_x = numpy.add.reduce(prev_data[n_x - 1, :, :n_vx//2, :], (1, 2)) 
-  
-    for i_vx in range(n_vx):
-        for i_vy in range(n_vy):
-            v = get_v(i_vx, i_vy)
-            if v[0] < 0:
-                data[0, :, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_pos_x/S_x
-            elif v[0] > 0:
-                data[n_x - 1, :, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_neg_x/S_x
-                
+    #near_wall_x = numpy.swapaxes(prev_data, 2, 3)
+
+    #S_pos_x = numpy.add.reduce(numpy.dot(near_wall_x[0, :, :, n_vx//2+1:], Vx_plus), (1))
+    #S_neg_x = numpy.add.reduce(numpy.dot(near_wall_x[n_x - 1, :, :, :n_vx//2], Vx_minu), (1)) 
+    
+    #S_pos_x = numpy.add.reduce(prev_data[0, :, n_vx//2 + 1:, :], (2))
+    #S_pos_x = numpy.dot(S_pos_x, Vx_plus)
+    
+    #S_neg_x = numpy.add.reduce(prev_data[n_x - 1, :, :n_vx//2, :], (2))
+    #S_neg_x = numpy.dot(S_neg_x, Vx_minu)
+
+    #S_pos_x = numpy.add.reduce(prev_data[0, :, n_vx//2+1:, :], (1, 2))
+    #S_neg_x = numpy.add.reduce(prev_data[n_x - 1, :, :n_vx//2, :], (1, 2)) 
+    # 
+    #for i_vx in range(n_vx):
+    #    for i_vy in range(n_vy):
+    #        v = get_v(i_vx, i_vy)
+    #        if v[0] < 0:
+    #            #data[0, :, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_pos_x/S_x
+    #            data[0, :, i_vx, i_vy] = S_pos_x /((n_vx//2) * n_vy)
+    #        elif v[0] > 0:
+    #            #data[n_x - 1, :, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_neg_x/S_x
+    #            data[n_x - 1, :, i_vx, i_vy] = S_neg_x/((n_vx//2) * n_vy)                
+
+    #easy_x_diffusion()
 
     data, prev_data = prev_data, data
 
@@ -155,33 +210,50 @@ def calc_epoch(i):
             v = get_v(i_vx, i_vy)
             data[:, 1:-1, i_vx, i_vy] = formula_precise(prev_data, i_vx, i_vy, (0, 1))[:, 1:-1]
             if v[1] < 0:
-                data[:, :-1, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (0, 1))[:, :-1]
+                data[:, :-1, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (0, 1))[:, :-1]  # Не могу понять,
+                                                                                                 # почему именно такой срез,
+                                                                                                 # а не [:, -1:, i_vx, i_vy]
             else:
                 data[:, :1, i_vx, i_vy] = formula_rough(prev_data, i_vx, i_vy, (0, 1))[:, :1]
    
     # Зеркальное отражение по Y
-    #for i_x in range(n_x):
-    #    for i_vx in range(n_vx):
-    #        for i_vy in range(n_vy):
-    #            v = get_v(i_vx, i_vy)
-    #            if v[1] < 0:
-    #                data[i_x, 0, i_vx, i_vy] = prev_data[i_x, 0, i_vx, n_vy - i_vy - 1]
-    #            else:
-    #                data[i_x, n_y - 1, i_vx, i_vy] = prev_data[i_x, n_y - 1, i_vx, n_vy - i_vy - 1]
+    for i_x in range(n_x):
+        for i_vx in range(n_vx):
+            for i_vy in range(n_vy):
+                v = get_v(i_vx, i_vy)
+                if v[1] < 0:
+                    data[i_x, 0, i_vx, i_vy] = prev_data[i_x, 0, i_vx, n_vy - i_vy - 1]
+                else:
+                    data[i_x, n_y - 1, i_vx, i_vy] = prev_data[i_x, n_y - 1, i_vx, n_vy - i_vy - 1]
     
-    S_pos_y = numpy.add.reduce(prev_data[:, 0, :, n_vy//2+1:], (1, 2)) 
-    S_neg_y = numpy.add.reduce(prev_data[:, n_y - 1, :, :n_vy//2], (1, 2))
-    
-    for i_vx in range(n_vx):
-        for i_vy in range(n_vy):
-            v = get_v(i_vx, i_vy)
-            if v[1] < 0:
-                data[:, 0, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_pos_y/S_y
-            elif v[1] > 0:
-                data[:, n_y - 1, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_neg_y/S_y
-   
 
-    print (numpy.add.reduce(data[:, 0, :, :3], (0, 1, 2)) / numpy.add.reduce(prev_data[:, 0, :, 4:], (0, 1, 2)))
+    #S_pos_y = numpy.add.reduce(numpy.dot(prev_data[:, 0, :, n_vy//2+1:], Vy_plus), (1)) 
+    #S_neg_y = numpy.add.reduce(numpy.dot(prev_data[:, n_y - 1, :, :n_vy//2], Vy_minu), (1))
+    
+    #S_pos_y = numpy.add.reduce(prev_data[:, 0, :, n_vy//2 + 1:], (1))
+    #S_pos_y = numpy.dot(S_pos_y, Vy_plus)
+    #S_neg_y = numpy.add.reduce(prev_data[:, n_y - 1, :, :n_vy//2], (1))
+    #S_neg_y = numpy.dot(S_neg_y, Vy_minu)
+
+    #S_pos_y = numpy.add.reduce(prev_data[:, 0, :, n_vy//2+1:], (1, 2)) 
+    #S_neg_y = numpy.add.reduce(prev_data[:, n_y - 1, :, :n_vy//2], (1, 2))
+    
+    #for i_vx in range(n_vx):
+    #    for i_vy in range(n_vy):
+    #        v = get_v(i_vx, i_vy)
+    #        if v[1] < 0:
+    #            #data[:, 0, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_pos_y/S_y
+    #            data[:, 0, i_vx, i_vy] = S_pos_y / (n_vx * (n_vy//2))
+    #        elif v[1] > 0:
+    #            #data[:, n_y - 1, i_vx, i_vy] = numpy.exp(-0.5*(v[0]**2 + v[1]**2))*S_neg_y/S_y
+    #            data[:, n_y - 1, i_vx, i_vy] = S_neg_y / (n_vx * (n_vy//2))
+    
+    #easy_y_diffusion()
+
+    print (numpy.add.reduce(data[:, 0, :, :n_vx//2], (0, 1, 2)) - numpy.add.reduce(prev_data[:, 0, :, n_vx//2 + 1:], (0, 1, 2)))
+    print (numpy.add.reduce(data[:, -1, :, n_vx//2 + 1:], (0, 1, 2)) - numpy.add.reduce(prev_data[:, -1, :, :n_vx//2], (0, 1, 2)))
+    print (numpy.add.reduce(data[0, :, :n_vy//2, :], (0, 1, 2)) - numpy.add.reduce(prev_data[0, :, n_vy//2 + 1:, :], (0, 1, 2)))
+    print (numpy.add.reduce(data[-1, :, n_vy//2 + 1:, :], (0, 1, 2)) - numpy.add.reduce(prev_data[-1, :, :n_vy//2, :], (0, 1, 2)))
     print ('\n')
 
 
@@ -190,7 +262,7 @@ def calc_epoch(i):
     concentration = calculate_concentration()
     total_count = numpy.add.reduce(concentration, (0, 1))
     #if i % 10 == 0:
-    time = datetime.now().time()
+    time = i
     print(f"{time}. Step {i}. Total count: {total_count}")
     #save_to_file(f"out_{i:03}.dat", concentration)
     #return total_count 
@@ -209,6 +281,6 @@ def main():
 
 main()
 _animation = FuncAnimation(fig, calc_epoch, repeat=False, frames=n_epoch)
-#plt.show()
+plt.show()
 
-_animation.save('diffusion.gif', writer='imagemagic', fps=15)
+#_animation.save('diffusion_easy.gif', writer='imagemagic', fps=15)
