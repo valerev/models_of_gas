@@ -28,7 +28,7 @@ y2_data = []
 
 fig = plt.figure()
 axes = plt.axes(
-#                projection='3d'
+                projection='3d'
                 )
 space_x = numpy.linspace(0, dx * n_x, n_x)
 space_y = numpy.linspace(0, dy * n_y, n_y)
@@ -175,7 +175,8 @@ def easy_y_diffusion():
     S_pos_y = numpy.add.reduce(prev_data[:, 0, :, n_vy//2+1:], (1, 2)) 
     S_neg_y = numpy.add.reduce(prev_data[:, n_y - 1, :, :n_vy//2], (1, 2))
     S_out_y = numpy.add.reduce(prev_data[wall_x:, wall_y + 1, :, n_vy//2+1:], (1, 2))
-    
+    S_wal_y = numpy.add.reduce(prev_data[wall_x:, wall_y - 1, :, :n_vy//2], (1, 2))
+
     for i_vx in range(n_vx):
         for i_vy in range(n_vy):
             v = get_v(i_vx, i_vy)
@@ -184,7 +185,31 @@ def easy_y_diffusion():
                 data[wall_x:, wall_y + 1, i_vx, i_vy] = S_out_y / (n_vx * (n_vy//2))
             elif v[1] > 0:
                 data[:, n_y - 1, i_vx, i_vy] = S_neg_y / (n_vx * (n_vy//2))
- 
+                data[wall_x:, wall_y - 1, i_vx, i_vy] = S_wal_y / (n_vx * (n_vy//2))
+
+
+def x_reflection():
+    for i_y in range(n_y):
+        for i_vx in range(n_vx):
+            for i_vy in range(n_vy):
+                v = get_v(i_vx, i_vy)
+                if v[0] < 0:
+                    data[0, i_y, i_vx, i_vy] = prev_data[0, i_y, n_vx - i_vx - 1, i_vy]
+                else:
+                    data[n_x - 1, i_y, i_vx, i_vy] = prev_data[n_x - 1, i_y, n_vx - i_vx - 1, i_vy]
+                    data[wall_x - 1, wall_y, i_vx, i_vy] = prev_data[wall_x - 1, wall_y, n_vx - i_vx - 1, i_vy]
+
+
+def y_reflection():
+    for i_x in range(n_x):
+        for i_vx in range(n_vx):
+            for i_vy in range(n_vy):
+                v = get_v(i_vx, i_vy)
+                if v[1] < 0:
+                    data[i_x, 0, i_vx, i_vy] = prev_data[i_x, 0, i_vx, n_vy - i_vy - 1]
+                else:
+                    data[i_x, n_y - 1, i_vx, i_vy] = prev_data[i_x, n_y - 1, i_vx, n_vy - i_vy - 1]
+
 
 def calc_epoch(i):
     global data, prev_data
@@ -287,7 +312,7 @@ def calc_epoch(i):
     print(f"{time}. Step {i}. Total count: {total_count}")
     #save_to_file(f"out_{i:03}.dat", concentration)
     #return total_count
-    #return draw(concentration)
+    return draw(concentration)
 
 
 def main():
@@ -301,25 +326,25 @@ def main():
 
 
 main()
-#_animation = FuncAnimation(fig, calc_epoch, repeat=False, frames=n_epoch)
+_animation = FuncAnimation(fig, calc_epoch, repeat=False, frames=n_epoch)
 #plt.show()
 
 #_animation.save('outflow_4.gif', writer='imagemagic', fps=15)
 
-for i in range(n_epoch):
-    calc_epoch(i)
+#for i in range(n_epoch):
+#    calc_epoch(i)
 
-file1 = open('data1', 'w')
-for num in y1_data:
-    file1.write(str(num) + '\n')
-file1.close()
+#file1 = open('data1', 'w')
+#for num in y1_data:
+#    file1.write(str(num) + '\n')
+#file1.close()
 
-file2 = open('data2', 'w')
-for num in y2_data:
-    file2.write(str(num) + '\n')
-file2.close()
+#file2 = open('data2', 'w')
+#for num in y2_data:
+#    file2.write(str(num) + '\n')
+#file2.close()
 
-axes.plot(x_data, y1_data)
-axes.plot(x_data, y2_data)
+#axes.plot(x_data, y1_data)
+#axes.plot(x_data, y2_data)
 
 plt.show()
