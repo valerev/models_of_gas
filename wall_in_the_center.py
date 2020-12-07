@@ -7,7 +7,7 @@ import numpy
 rx, ry, ax, ay = 3, 3, 5, 15
 eps = 0.01
 
-n_epoch = 1200
+n_epoch = 1000
 n_x, n_y, n_vx, n_vy = 50, 50, 15, 15
 dt, dx, dy, dv = 2, 2, 2, 0.1  # It was 1, 1, 1, 0.2
 
@@ -19,7 +19,8 @@ concent = 100
 wall_x_phy = 15
 wall_y_phy = 50
 
-wall_x = (wall_x_phy * n_x) // 100
+#wall_x = (wall_x_phy * n_x) // 100
+wall_x = 3
 wall_y = (wall_y_phy * n_y) // 100
 
 x_data = []
@@ -28,7 +29,7 @@ y2_data = []
 
 fig = plt.figure()
 axes = plt.axes(
-                projection='3d'
+#                projection='3d'
                 )
 space_x = numpy.linspace(0, dx * n_x, n_x)
 space_y = numpy.linspace(0, dy * n_y, n_y)
@@ -40,7 +41,7 @@ levels = numpy.linspace(-0.01, 5, 500)
 
 def draw(surface):
     axes.clear()
-    axes.set_zlim((0, 4))
+    axes.set_zlim((0, 1))
     return axes.plot_surface(X, Y, surface, cmap='inferno',
             #levels=levels
             )
@@ -74,8 +75,8 @@ def initial_f(i_x, i_y, i_vx, i_vy):
     #return eps
 
     if i_y < wall_y:
-        return concent
-    return eps
+        return 0.004
+    return 0.001
 
 def initialize():
     for i_vx in range(n_vx):
@@ -312,7 +313,7 @@ def calc_epoch(i):
     print(f"{time}. Step {i}. Total count: {total_count}")
     #save_to_file(f"out_{i:03}.dat", concentration)
     #return total_count
-    return draw(concentration)
+    #return draw(concentration)
 
 
 def main():
@@ -326,25 +327,25 @@ def main():
 
 
 main()
-_animation = FuncAnimation(fig, calc_epoch, repeat=False, frames=n_epoch)
+#_animation = FuncAnimation(fig, calc_epoch, repeat=False, frames=n_epoch)
 #plt.show()
 
 #_animation.save('outflow_4.gif', writer='imagemagic', fps=15)
 
-#for i in range(n_epoch):
-#    calc_epoch(i)
+for i in range(n_epoch):
+    calc_epoch(i)
 
-#file1 = open('data1', 'w')
-#for num in y1_data:
-#    file1.write(str(num) + '\n')
-#file1.close()
+file1 = open('data(in)_wall_3', 'w')
+for num in y1_data:
+    file1.write(str(num) + '\n')
+file1.close()
 
-#file2 = open('data2', 'w')
-#for num in y2_data:
-#    file2.write(str(num) + '\n')
-#file2.close()
+file2 = open('data(out)_wall_3', 'w')
+for num in y2_data:
+    file2.write(str(num) + '\n')
+file2.close()
 
-#axes.plot(x_data, y1_data)
-#axes.plot(x_data, y2_data)
+axes.plot(x_data, y1_data)
+axes.plot(x_data, y2_data)
 
 plt.show()
