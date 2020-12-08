@@ -7,7 +7,7 @@ import numpy
 rx, ry, ax, ay = 3, 3, 5, 15
 eps = 0.01
 
-n_epoch = 1000
+n_epoch = 1500
 n_x, n_y, n_vx, n_vy = 50, 50, 15, 15
 dt, dx, dy, dv = 2, 2, 2, 0.1  # It was 1, 1, 1, 0.2
 
@@ -22,7 +22,7 @@ wall_x_phy = 15
 wall_y_phy = 50
 
 #wall_x = (wall_x_phy * n_x) // 100
-wall_x = 2
+wall_x = 5
 wall_y = (wall_y_phy * n_y) // 100
 
 x_data = []
@@ -39,13 +39,13 @@ X, Y = numpy.meshgrid(space_x, space_y)
 #X = numpy.arange(61 * dx, dx * n_x, dx)
 #Y = numpy.arange(0 * dy, dy * n_y, dy)
 
-levels = numpy.linspace(-0.01, 5, 500)
+levels = numpy.linspace(-0.01, 1, 1000)
 
 def draw(surface):
     axes.clear()
-    axes.set_zlim((0, 1))
-    return axes.plot_surface(X, Y, surface, cmap='inferno',
-            #levels=levels
+    #axes.set_zlim((0, 1))
+    return axes.contourf(X, Y, surface, cmap='inferno',
+            levels=levels
             )
 
 
@@ -160,17 +160,17 @@ def save_to_file(filename, array):
 
 
 def easy_x_diffusion(alpha):
-    S_pos_x = numpy.add.reduce(prev_data[0, :wall_y, n_vx//2+1:, :], (1, 2))
-    S_neg_x = numpy.add.reduce(prev_data[n_x - 1, :wall_y, :n_vx//2, :], (1, 2)) 
+    S_pos_x = numpy.add.reduce(prev_data[0, :, n_vx//2+1:, :], (1, 2))
+    S_neg_x = numpy.add.reduce(prev_data[n_x - 1, :, :n_vx//2, :], (1, 2)) 
     S_wall_x = numpy.add.reduce(prev_data[wall_x - 1, wall_y, :n_vx//2, :], (0, 1))
  
     for i_vx in range(n_vx):
         for i_vy in range(n_vy):
             v = get_v(i_vx, i_vy)
             if v[0] < 0:
-                data[0, :wall_y, i_vx, i_vy] = alpha * S_pos_x / ((n_vx//2) * n_vy)
+                data[0, :, i_vx, i_vy] = alpha * S_pos_x / ((n_vx//2) * n_vy)
             elif v[0] > 0:
-                data[n_x - 1, :wall_y, i_vx, i_vy] = alpha * S_neg_x / ((n_vx//2) * n_vy)
+                data[n_x - 1, :, i_vx, i_vy] = alpha * S_neg_x / ((n_vx//2) * n_vy)
                 data[wall_x - 1, wall_y, i_vx, i_vy] = alpha * S_wall_x / ((n_vx//2) * n_vy)
 
 
@@ -187,7 +187,7 @@ def easy_y_diffusion(alpha):
                 data[:, 0, i_vx, i_vy] = alpha * S_pos_y / (n_vx * (n_vy//2))
                 data[wall_x:, wall_y + 1, i_vx, i_vy] = alpha * S_out_y / (n_vx * (n_vy//2))
             elif v[1] > 0:
-                #data[:, n_y - 1, i_vx, i_vy] = alpha * S_neg_y / (n_vx * (n_vy//2))
+                data[:, n_y - 1, i_vx, i_vy] = alpha * S_neg_y / (n_vx * (n_vy//2))
                 data[wall_x:, wall_y - 1, i_vx, i_vy] = alpha * S_wal_y / (n_vx * (n_vy//2))
 
 
@@ -303,7 +303,7 @@ def calc_epoch(i):
     print ('\n')
 
     x_data.append(i)
-    y1_data.append(numpy.add.reduce(data[:, :wall_y, :, :], (0, 1, 2, 3)))
+    #y1_data.append(numpy.add.reduce(data[:, :wall_y, :, :], (0, 1, 2, 3)))
     #y2_data.append(numpy.add.reduce(data[:, wall_y + 1:, :, :], (0, 1, 2, 3)))
 
     data, prev_data = prev_data, data
@@ -329,25 +329,25 @@ def main():
 
 
 main()
-#_animation = FuncAnimation(fig, calc_epoch, repeat=False, frames=n_epoch)
+_animation = FuncAnimation(fig, calc_epoch, repeat=False, frames=n_epoch)
 #plt.show()
 
-#_animation.save('outflow_4.gif', writer='imagemagic', fps=15)
+_animation.save('outflow_3.gif', writer='imagemagic', fps=15)
 
-for i in range(n_epoch):
-    calc_epoch(i)
+#for i in range(n_epoch):
+#    calc_epoch(i)
 
-file1 = open('into_space_2', 'w')
-for num in y1_data:
-    file1.write(str(num) + '\n')
-file1.close()
+#file1 = open('into_space_12', 'w')
+#for num in y1_data:
+#    file1.write(str(num) + '\n')
+#file1.close()
 
 #file2 = open('data(out)_wall_30', 'w')
 #for num in y2_data:
 #    file2.write(str(num) + '\n')
 #file2.close()
 
-axes.plot(x_data, y1_data)
+#axes.plot(x_data, y1_data)
 #axes.plot(x_data, y2_data)
 
-plt.show()
+#plt.show()
